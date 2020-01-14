@@ -7,21 +7,15 @@ const AppManifestWebpackPlugin = require('app-manifest-webpack-plugin');
 module.exports = {
     mode: process.env.NODE_ENV || 'development',
     context: path.resolve('src'),
-    entry: './app/index.js',
-    output: {
-        filename: 'bundle.js',
-    },
+    entry: { bundle: './app' },
     plugins: [
         new CleanWebpackPlugin({ cleanOnceBeforeBuildPatterns: ['**/*', '!.gitkeep'] }),
         new CopyWebpackPlugin([
-            './sw.js',
+            'sw.js',
         ]),
-        new HtmlWebpackPlugin({
-            template: './template.ejs',
-            title: 'PWA boilerplate',
-        }),
+        new HtmlWebpackPlugin({ template: 'template.html' }),
         new AppManifestWebpackPlugin ({
-            logo: './assets/logo.png',
+            logo: './assets/images/logo.png',
             output: 'assets/',
             prefix: '/assets',
             persistentCache: false,
@@ -37,22 +31,22 @@ module.exports = {
     module: {
         rules: [
             {
-                test: /\.js$/,
+                test: /\.jsx?$/,
                 exclude: /node_modules/,
                 use: 'babel-loader',
             },
             {
-                test: /\.(c|sc|sa)ss$/,
-                use: [
-                    'style-loader',
-                    'css-loader',
-                    'sass-loader',
-                ],
+                test: /\.scss$/,
+                use: ['style-loader', 'css-loader', 'sass-loader', 'import-glob-loader'],
             },
         ],
     },
+    resolve: {
+        extensions: ['.wasm', '.mjs', '.jsx', '.js', '.json'],
+    },
     devtool: 'source-map',
     devServer: {
-        hot: true,
+        historyApiFallback: true,
+        stats: 'errors-only',
     },
 };

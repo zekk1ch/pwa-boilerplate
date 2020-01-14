@@ -1,87 +1,49 @@
-const CACHE_NAME = 'static-v1';
-const ASSET_URLS = [
-    '/',
+const CACHE_NAME = 'PWA-boilerplate__v1';
+const STATIC_ASSET_URLS = [
+    '/index.html',
     '/bundle.js',
     '/sw.js',
+    '/assets/favicon.ico',
+    '/assets/manifest.json',
+    '/assets/android-chrome-512x512.png',
 ];
 
-self.addEventListener('install', handleInstall);
-self.addEventListener('activate', handleActivate);
-self.addEventListener('fetch',  handleFetch);
-
-
-
-function handleInstall(e) {
+self.addEventListener('install', e => {
     e.waitUntil(
-        cacheAssets()
+        caches
+            .open(CACHE_NAME)
+            .then(cache => cache.addAll(STATIC_ASSET_URLS))
+            .catch(err => console.error(err))
     );
-}
+});
 
-function handleActivate(e) {
-    e.waitUntil(
-        Promise.all([
-            invalidateForeignCaches(),
-            invalidateForeignAssets(),
-        ])
-    );
-}
-
-function handleFetch(e) {
+self.addEventListener('fetch', e => {
     e.respondWith(
-        doFetch(e.request)
+        fetch(e.request.clone())
+            .then(response => {
+                if (!response.ok) {
+                    throw response;
+                }
+
+                if (e.request.method === 'GET' && STATIC_ASSET_URLS.includes(e.request.url)) {
+                    caches
+                        .open(CACHE_NAME)
+                        .then(cache => cache.put(e.request, response))
+                        .catch(err => console.error(err));
+                }
+
+                return response.clone();
+            })
+            .catch(err => {
+                const response = err instanceof Response ? err : new Response(null, { status: 503 });
+
+                return caches
+                    .match(e.request)
+                    .then(cachedResponse => cachedResponse ? cachedResponse : response)
+                    .catch(err => {
+                        console.error(err);
+                        return response;
+                    });
+            })
     );
-}
-
-
-
-async function cacheAssets() {
-    const cache = await caches.open(CACHE_NAME);
-    await cache.addAll(ASSET_URLS);
-}
-
-async function invalidateForeignCaches() {
-    let promises;
-
-    const cacheNames = await caches.keys();
-    promises = cacheNames
-        .filter((cacheName) => cacheName !== CACHE_NAME)
-        .map((cacheName) => caches.delete(cacheName));
-
-    await Promise.all(promises);
-}
-
-async function invalidateForeignAssets() {
-    let promises;
-
-    const cache = await caches.open(CACHE_NAME);
-    const responses = await cache.matchAll();
-    promises = responses
-        .map((response) => response.url.replace(location.origin, ''))
-        .filter((url) => !ASSET_URLS.includes(url))
-        .map((url) => cache.delete(url));
-
-    await Promise.all(promises);
-}
-
-async function doFetch(req) {
-    let response, isResponseOk;
-
-    try {
-        response = await fetch(req);
-        isResponseOk = response.ok;
-    } catch {
-        isResponseOk = false;
-    }
-
-    if (isResponseOk) {
-        const cache = await caches.open(CACHE_NAME);
-        await cache.put(req, response.clone());
-    } else {
-        const cachedResponse = await caches.match(req);
-        if (cachedResponse) {
-            return cachedResponse;
-        }
-    }
-
-    return response;
-}
+});
